@@ -1,0 +1,9 @@
+#ens-profile-iframe {
+  all: initial;
+  position: absolute !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+  z-index: 999999 !important;
+  background-color: white !important;
+}
