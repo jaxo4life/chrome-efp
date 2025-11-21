@@ -1,9 +1,27 @@
+let featureEnabled = true;
+
+chrome.storage.sync.get({ enabled: true }, ({ enabled }) => {
+  featureEnabled = enabled;
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled) {
+    featureEnabled = changes.enabled.newValue;
+
+    if (!featureEnabled) {
+      removeIframe();
+    }
+  }
+});
+
 const ENS_REGEX = /([\p{L}\p{N}\p{M}\p{So}\p{Sk}_-]+)\.(eth|xyz|box)/iu;
 const ETH_ADDRESS_REGEX = /\b0x[a-fA-F0-9]{40}\b/;
 
 let currentIframe = null;
 
 document.addEventListener("mouseup", (event) => {
+  if (!featureEnabled) return;
+
   setTimeout(() => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -99,6 +117,8 @@ window.addEventListener("message", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  if (!featureEnabled) return;
+  
   if (currentIframe && !currentIframe.contains(event.target)) {
     removeIframe();
   }
