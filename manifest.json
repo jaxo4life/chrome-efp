@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "EFPEverywhere",
-  "version": "1.0",
+  "version": "1.1",
   "description": "EFP Happens everywhere",
   "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://api.ethfollow.xyz/*"],
+  "host_permissions": ["https://*.ethfollow.xyz/*"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "EFP Everywhere"

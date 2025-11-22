@@ -57,5 +57,9 @@ function App() {
   );
 }
 
+document.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
 const root = createRoot(document.getElementById("root"));
 root.render(<App />);

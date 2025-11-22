@@ -11,12 +11,46 @@
         background: #f7f8fa;
         color: #222;
         width: 220px;
+        position: relative;
       }
 
       .title {
         font-size: 15px;
         margin-bottom: 12px;
         font-weight: 650;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .help-icon {
+        font-weight: bold;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #555;
+      }
+
+      .tooltip {
+        display: none;
+        position: absolute;
+        top: 30px;
+        right: 20px;
+        width: 200px;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        font-size: 12px;
+        line-height: 1.4;
+        z-index: 10;
       }
 
       .switch {
@@ -80,7 +114,17 @@
   </head>
 
   <body>
-    <div class="title">ENS Everywhere</div>
+    <div class="title">
+      ENS Everywhere
+      <div class="help-icon" id="help">?</div>
+    </div>
+
+    <div class="tooltip" id="tooltip">
+      When the extension is enabled, it will automatically detect ENS domains
+      and wallet addresses. A marker will appear below the ENS or address.
+      Hovering over it will show the EFP card. Clicking any empty area will hide
+      the card.
+    </div>
 
     <div class="row">
       <label class="switch">
