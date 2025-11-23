@@ -9,7 +9,7 @@ function isAggressiveModeSite() {
 
 const useAggressiveMode = isAggressiveModeSite();
 
-const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f]+\.)+)(eth|box)/giu;
+const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f-]+\.)+)(eth|box)/giu;
 const ETH_ADDRESS_REGEX = /\b0x[a-fA-F0-9]{40}\b/;
 const GLOBAL_REGEX = new RegExp(
   `${ENS_REGEX.source}|${ETH_ADDRESS_REGEX.source}`,
