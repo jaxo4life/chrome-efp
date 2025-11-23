@@ -1,8 +1,19 @@
 let featureEnabled = true;
 
-chrome.storage.sync.get({ enabled: true }, ({ enabled }) => {
-  featureEnabled = enabled;
-  if (enabled) startObserver();
+chrome.storage.sync.get({ siteSettings: {} }, ({ siteSettings }) => {
+  const site = location.origin;
+
+  if (siteSettings[site] === false) {
+
+    return;
+  }
+
+  chrome.storage.sync.get({ enabled: true }, ({ enabled }) => {
+    featureEnabled = enabled;
+    if (featureEnabled) {
+      startObserver();
+    }
+  });
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -13,7 +24,49 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f]+\.)+)(eth|xyz|box)/giu;
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "SHOW_BLOCK_MESSAGE") {
+    showBlockedMessage(message.text);
+  }
+});
+
+function showBlockedMessage(text) {
+  const box = document.createElement("div");
+  box.textContent = text;
+
+  box.style.position = "fixed";
+  box.style.top = "50%";
+  box.style.left = "50%";
+  box.style.transform = "translate(-50%, -50%)";
+  box.style.padding = "16px 32px";
+  box.style.background = "linear-gradient(135deg, #4facfe, #00f2fe)";
+  box.style.color = "rgba(255, 255, 255, 0.85)";
+  box.style.fontSize = "18px";
+  box.style.fontWeight = "600";
+  box.style.borderRadius = "16px";
+  box.style.zIndex = "999999999";
+  box.style.backdropFilter = "blur(6px)";
+  box.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+  box.style.textAlign = "center";
+  box.style.transition = "transform 0.3s ease, opacity 0.3s ease";
+  box.style.opacity = "0";
+
+  document.body.appendChild(box);
+
+  requestAnimationFrame(() => {
+    box.style.transform = "translate(-50%, -50%) scale(1.05)";
+    box.style.opacity = "1";
+  });
+
+  setTimeout(() => {
+    box.style.transform = "translate(-50%, -50%) scale(0.9)";
+    box.style.opacity = "0";
+    setTimeout(() => box.remove(), 300);
+  }, 2000);
+}
+
+
+const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f]+\.)+)(eth|box)/giu;
 const ETH_ADDRESS_REGEX = /\b0x[a-fA-F0-9]{40}\b/;
 const GLOBAL_REGEX = new RegExp(
   `${ENS_REGEX.source}|${ETH_ADDRESS_REGEX.source}`,
@@ -60,69 +113,81 @@ function startObserver() {
   window.addEventListener("resize", debouncedScan, { passive: true });
 }
 
-function scanVisibleArea() {
-  const viewportHeight = window.innerHeight;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-
+function collectTextNodes(parent) {
   const nodes = [];
-  let node;
+  let mergedText = "";
 
-  while ((node = walker.nextNode())) {
-    if (!isAllowedNode(node)) continue;
-
-    if (!node.parentNode) continue;
-
-    if (node.parentNode.closest(".ens-detected")) continue;
-
-    const rect = node.parentNode.getBoundingClientRect();
-
-    if (rect.bottom < 0 || rect.top > viewportHeight) continue;
-
-    if (GLOBAL_REGEX.test(node.textContent)) {
-      nodes.push(node);
+  parent.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      nodes.push(child);
+      mergedText += child.textContent;
+    } else if (
+      child.nodeType === Node.ELEMENT_NODE &&
+      !child.classList.contains("ens-detected")
+    ) {
+      if (
+        child.childNodes.length === 1 &&
+        child.firstChild.nodeType === Node.TEXT_NODE
+      ) {
+        nodes.push(child.firstChild);
+        mergedText += child.textContent;
+      }
     }
-  }
+  });
 
-  nodes.forEach(wrapMatches);
+  return { nodes, text: mergedText };
 }
 
-function wrapMatches(textNode) {
-  if (!isAllowedNode(textNode)) return;
+function scanVisibleArea() {
+  const viewportHeight = window.innerHeight;
 
-  const text = textNode.textContent;
-  const parent = textNode.parentNode;
-  if (!parent) return;
+  const all = document.querySelectorAll("body *:not(.ens-detected)");
 
+  all.forEach((el) => {
+    if (!el.childNodes || el.childNodes.length === 0) return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom < -20 || rect.top > viewportHeight + 20) return;
+
+    const { nodes, text } = collectTextNodes(el);
+    if (!nodes.length) return;
+
+    if (GLOBAL_REGEX.test(text)) {
+      wrapMergedNodes(nodes, text, el);
+    }
+  });
+}
+
+function wrapMergedNodes(nodes, fullText, parent) {
   const frag = document.createDocumentFragment();
-  let last = 0;
+  let lastIndex = 0;
 
-  text.replace(GLOBAL_REGEX, (match, _g1, _g2, offset) => {
-    if (offset > last) {
-      frag.appendChild(document.createTextNode(text.slice(last, offset)));
+  fullText.replace(GLOBAL_REGEX, (match, _g1, _g2, offset) => {
+    if (offset > lastIndex) {
+      frag.appendChild(
+        document.createTextNode(fullText.slice(lastIndex, offset))
+      );
     }
 
+    const cleaned = normalizeENS(match);
     const span = document.createElement("span");
     span.className = "ens-detected";
-
-    const cleaned = normalizeENS(match);
     span.textContent = cleaned;
     span.dataset.value = cleaned;
-
     span.dataset.type = ENS_REGEX.test(cleaned) ? "ens" : "address";
 
     span.style.cursor = "pointer";
-    span.style.textDecoration = "underline";
-    span.style.textDecorationStyle = "dotted";
+    span.style.textDecoration = "underline dotted";
 
     frag.appendChild(span);
-    last = offset + match.length;
+    lastIndex = offset + match.length;
   });
 
-  if (last < text.length) {
-    frag.appendChild(document.createTextNode(text.slice(last)));
+  if (lastIndex < fullText.length) {
+    frag.appendChild(document.createTextNode(fullText.slice(lastIndex)));
   }
 
-  parent.replaceChild(frag, textNode);
+  parent.replaceChildren(frag);
 }
 
 document.addEventListener("mouseover", (e) => {
@@ -144,13 +209,8 @@ document.addEventListener("mouseover", (e) => {
 document.addEventListener("click", (e) => {
   if (!featureEnabled) return;
 
-  if (currentIframe && currentIframe.contains(e.target)) {
-    return;
-  }
-
-  if (e.target.classList.contains("ens-detected")) {
-    return;
-  }
+  if (currentIframe && currentIframe.contains(e.target)) return;
+  if (e.target.classList.contains("ens-detected")) return;
 
   removeIframe();
 });
@@ -210,21 +270,16 @@ function positionIframe(x, y, width = 420, height = 500) {
     newX = viewportWidth - width - margin;
   }
 
-  if (newX < margin) {
-    newX = margin;
-  }
+  if (newX < margin) newX = margin;
 
   if (newY + height > viewportHeight - margin) {
     newY = y - height - 18;
   }
 
-  if (newY < margin) {
-    newY = margin;
-  }
+  if (newY < margin) newY = margin;
 
   return { x: newX, y: newY };
 }
-
 function cleanupMarkers() {
   document.querySelectorAll(".ens-detected").forEach((el) => {
     el.replaceWith(document.createTextNode(el.textContent));
@@ -234,11 +289,8 @@ function cleanupMarkers() {
 
 function isAllowedNode(node) {
   if (!node.parentNode) return false;
-
   const p = node.parentNode;
-
   if (["SCRIPT", "STYLE", "NOSCRIPT"].includes(p.tagName)) return false;
   if (p.getAttribute("type") === "speculationrules") return false;
-
   return true;
 }
