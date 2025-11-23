@@ -1,18 +1,28 @@
 let featureEnabled = true;
 
+const AGGRESSIVE_MODE_SITES = ["poap.xyz"];
+
+function isAggressiveModeSite() {
+  const hostname = window.location.hostname;
+  return AGGRESSIVE_MODE_SITES.some((site) => hostname.includes(site));
+}
+
+const useAggressiveMode = isAggressiveModeSite();
+
+const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f]+\.)+)(eth|box)/giu;
+const ETH_ADDRESS_REGEX = /\b0x[a-fA-F0-9]{40}\b/;
+const GLOBAL_REGEX = new RegExp(
+  `${ENS_REGEX.source}|${ETH_ADDRESS_REGEX.source}`,
+  "giu"
+);
+
 chrome.storage.sync.get({ siteSettings: {} }, ({ siteSettings }) => {
   const site = location.origin;
-
-  if (siteSettings[site] === false) {
-
-    return;
-  }
+  if (siteSettings[site] === false) return;
 
   chrome.storage.sync.get({ enabled: true }, ({ enabled }) => {
     featureEnabled = enabled;
-    if (featureEnabled) {
-      startObserver();
-    }
+    if (featureEnabled) startObserver();
   });
 });
 
@@ -33,7 +43,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function showBlockedMessage(text) {
   const box = document.createElement("div");
   box.textContent = text;
-
   box.style.position = "fixed";
   box.style.top = "50%";
   box.style.left = "50%";
@@ -52,7 +61,6 @@ function showBlockedMessage(text) {
   box.style.opacity = "0";
 
   document.body.appendChild(box);
-
   requestAnimationFrame(() => {
     box.style.transform = "translate(-50%, -50%) scale(1.05)";
     box.style.opacity = "1";
@@ -65,19 +73,12 @@ function showBlockedMessage(text) {
   }, 2000);
 }
 
-
-const ENS_REGEX = /((?:[\p{L}\p{N}\p{M}\p{S}\u200d\ufe0f]+\.)+)(eth|box)/giu;
-const ETH_ADDRESS_REGEX = /\b0x[a-fA-F0-9]{40}\b/;
-const GLOBAL_REGEX = new RegExp(
-  `${ENS_REGEX.source}|${ETH_ADDRESS_REGEX.source}`,
-  "giu"
-);
-
 function normalizeENS(text) {
-  return text.replace(/^[\*\•\-\—\·\s]+/, "");
+  return text.replace(/^[*•\-—·\s]+/, "");
 }
 
 let currentIframe = null;
+const processedNodes = new WeakSet();
 
 function debounce(fn, wait) {
   let timer = null;
@@ -98,6 +99,16 @@ function startObserver() {
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       if (m.addedNodes.length > 0) {
+        if (!useAggressiveMode) {
+          m.addedNodes.forEach((n) => {
+            if (
+              n.nodeType === Node.TEXT_NODE ||
+              n.nodeType === Node.ELEMENT_NODE
+            ) {
+              processedNodes.delete(n);
+            }
+          });
+        }
         debouncedScan();
         break;
       }
@@ -112,6 +123,148 @@ function startObserver() {
   window.addEventListener("scroll", debouncedScan, { passive: true });
   window.addEventListener("resize", debouncedScan, { passive: true });
 }
+
+// ==================== Safe Mode ====================
+
+function getTextInRange(startNode, endNode) {
+  let text = "";
+  let currentNode = startNode;
+  while (currentNode && currentNode !== endNode.nextSibling) {
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      text += currentNode.textContent;
+    } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+      if (!["SCRIPT", "STYLE", "NOSCRIPT"].includes(currentNode.tagName)) {
+        text += getTextInRange(
+          currentNode.firstChild,
+          currentNode.lastChild || currentNode
+        );
+      }
+    }
+    currentNode = currentNode.nextSibling;
+  }
+  return text;
+}
+
+function scanVisibleAreaConservative() {
+  const viewportHeight = window.innerHeight;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+
+  const nodes = [];
+  let node;
+
+  while ((node = walker.nextNode())) {
+    if (!isAllowedNode(node)) continue;
+    if (processedNodes.has(node)) continue;
+    if (!node.parentNode) continue;
+    if (node.parentNode.closest(".ens-detected")) continue;
+
+    const rect = node.parentNode.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > viewportHeight) continue;
+
+    nodes.push(node);
+  }
+
+  nodes.forEach(processTextNode);
+
+  for (let i = 0; i < nodes.length - 1; i++) {
+    tryProcessCrossNodeMatch(nodes[i], nodes[i + 1]);
+  }
+}
+
+function tryProcessCrossNodeMatch(node1, node2) {
+  const combined = node1.textContent + node2.textContent;
+  GLOBAL_REGEX.lastIndex = 0;
+  const match = GLOBAL_REGEX.exec(combined);
+
+  if (!match) return;
+
+  const matchText = normalizeENS(match[0]);
+  const len1 = node1.textContent.length;
+
+  if (match.index < len1 && match.index + match[0].length > len1) {
+    markCrossNodeMatch(node1, node2, match.index, matchText);
+    processedNodes.add(node1);
+    processedNodes.add(node2);
+  }
+}
+
+function markCrossNodeMatch(node1, node2, startOffset, text) {
+  const parent1 = node1.parentNode;
+  const parent2 = node2.parentNode;
+
+  if (!parent1 || !parent2) return;
+
+  const markId = "ens-" + Math.random().toString(36).substr(2, 9);
+
+  const attr1 = parent1.getAttribute("data-ens-start");
+  parent1.setAttribute("data-ens-start", (attr1 || "") + " " + markId);
+  parent1.classList.add("ens-detected-parent");
+
+  const attr2 = parent2.getAttribute("data-ens-end");
+  parent2.setAttribute("data-ens-end", (attr2 || "") + " " + markId);
+  parent2.classList.add("ens-detected-parent");
+
+  parent1.dataset[markId] = JSON.stringify({
+    value: text,
+    type: ENS_REGEX.test(text) ? "ens" : "address",
+    markId: markId,
+  });
+}
+
+function processTextNode(textNode) {
+  if (!isAllowedNode(textNode)) return;
+  if (processedNodes.has(textNode)) return;
+
+  const text = textNode.textContent;
+  const parent = textNode.parentNode;
+  if (!parent) return;
+
+  const matches = [];
+  GLOBAL_REGEX.lastIndex = 0;
+  let match;
+
+  while ((match = GLOBAL_REGEX.exec(text)) !== null) {
+    matches.push(match);
+  }
+
+  if (matches.length === 0) {
+    processedNodes.add(textNode);
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  let last = 0;
+
+  matches.forEach((match) => {
+    if (match.index > last) {
+      frag.appendChild(document.createTextNode(text.slice(last, match.index)));
+    }
+
+    const span = document.createElement("span");
+    span.className = "ens-detected";
+
+    const cleaned = normalizeENS(match[0]);
+    span.textContent = cleaned;
+    span.dataset.value = cleaned;
+    span.dataset.type = ENS_REGEX.test(cleaned) ? "ens" : "address";
+
+    span.style.cursor = "pointer";
+    span.style.textDecoration = "underline";
+    span.style.textDecorationStyle = "dotted";
+
+    frag.appendChild(span);
+    last = match.index + match[0].length;
+  });
+
+  if (last < text.length) {
+    frag.appendChild(document.createTextNode(text.slice(last)));
+  }
+
+  parent.replaceChild(frag, textNode);
+  processedNodes.add(textNode);
+}
+
+// ==================== Full Mode ====================
 
 function collectTextNodes(parent) {
   const nodes = [];
@@ -138,7 +291,7 @@ function collectTextNodes(parent) {
   return { nodes, text: mergedText };
 }
 
-function scanVisibleArea() {
+function scanVisibleAreaAggressive() {
   const viewportHeight = window.innerHeight;
 
   const all = document.querySelectorAll("body *:not(.ens-detected)");
@@ -189,6 +342,16 @@ function wrapMergedNodes(nodes, fullText, parent) {
 
   parent.replaceChildren(frag);
 }
+
+function scanVisibleArea() {
+  if (useAggressiveMode) {
+    scanVisibleAreaAggressive();
+  } else {
+    scanVisibleAreaConservative();
+  }
+}
+
+// ==================== General ====================
 
 document.addEventListener("mouseover", (e) => {
   if (!featureEnabled) return;
@@ -280,10 +443,21 @@ function positionIframe(x, y, width = 420, height = 500) {
 
   return { x: newX, y: newY };
 }
+
 function cleanupMarkers() {
   document.querySelectorAll(".ens-detected").forEach((el) => {
     el.replaceWith(document.createTextNode(el.textContent));
   });
+
+  document.querySelectorAll(".ens-detected-parent").forEach((el) => {
+    el.removeAttribute("data-ens-start");
+    el.removeAttribute("data-ens-end");
+    el.classList.remove("ens-detected-parent");
+    Object.keys(el.dataset).forEach((k) => {
+      if (k.startsWith("ens-")) delete el.dataset[k];
+    });
+  });
+
   removeIframe();
 }
 
