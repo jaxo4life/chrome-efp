@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EFPEverywhere",
-  "version": "1.2",
+  "version": "1.3",
   "description": "EFP Happens everywhere",
   "permissions": ["activeTab", "storage", "contextMenus", "scripting"],
   "host_permissions": ["https://*.ethfollow.xyz/*"],
