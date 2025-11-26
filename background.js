@@ -18,28 +18,40 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.tabs.onActivated.addListener(updateMenuTitle);
-chrome.tabs.onUpdated.addListener(updateMenuTitle);
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId, (tab) => {
+    if (!tab || !tab.lastCommittedUrl) return;
+    updateMenuTitleFromUrl(tab.lastCommittedUrl);
+  });
+});
 
-function updateMenuTitle() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs.length) return;
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab.lastCommittedUrl) {
+    updateMenuTitleFromUrl(tab.lastCommittedUrl);
+  }
+});
 
-    const tab = tabs[0];
-    if (!tab.url) return;
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  const url = details.url;
 
-    const site = new URL(tab.url).origin;
+  if (!url || url.startsWith("chrome://") || url.startsWith("about:")) return;
 
-    if (siteSettingsCache[site] === undefined) {
-      siteSettingsCache[site] = true;
-      chrome.storage.sync.set({ siteSettings: siteSettingsCache });
-    }
+  updateMenuTitleFromUrl(url);
+});
 
-    const disabled = siteSettingsCache[site] === false;
+function updateMenuTitleFromUrl(url) {
+  const site = new URL(url).origin;
 
-    chrome.contextMenus.update("toggle-site", {
-      title: disabled ? "Enable EFP on this site" : "Disable EFP on this site",
-    });
+  if (siteSettingsCache[site] === undefined) {
+    siteSettingsCache[site] = true;
+    chrome.storage.sync.set({ siteSettings: siteSettingsCache });
+  }
+
+  const disabled = siteSettingsCache[site] === false;
+
+  chrome.contextMenus.update("toggle-site", {
+    title: disabled ? "Enable EFP on this site" : "Disable EFP on this site",
   });
 }
 
@@ -52,11 +64,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   siteSettingsCache[site] = disabled ? true : false;
 
   chrome.storage.sync.set({ siteSettings: siteSettingsCache }, () => {
-    chrome.tabs.reload(tab.id);
-  });
-
-  chrome.tabs.sendMessage(tab.id, {
-    type: "SHOW_BLOCK_MESSAGE",
-    text: disabled ? "EFP Enabled on this site" : "EFP Disabled on this site",
+    chrome.tabs.sendMessage(tab.id, {
+      type: "SHOW_BLOCK_MESSAGE",
+      text: disabled ? "EFP Enabled on this site" : "EFP Disabled on this site",
+    });
+    setTimeout(() => {
+      chrome.tabs.reload(tab.id);
+    }, 1000);
   });
 });

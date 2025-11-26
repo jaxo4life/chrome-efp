@@ -46,7 +46,7 @@ function showBlockedMessage(text) {
   box.style.position = "fixed";
   box.style.top = "50%";
   box.style.left = "50%";
-  box.style.transform = "translate(-50%, -50%)";
+  box.style.transform = "translate(-50%, -50%) scale(0.9)";
   box.style.padding = "16px 32px";
   box.style.background = "linear-gradient(135deg, #4facfe, #00f2fe)";
   box.style.color = "rgba(255, 255, 255, 0.85)";
@@ -62,7 +62,7 @@ function showBlockedMessage(text) {
 
   document.body.appendChild(box);
   requestAnimationFrame(() => {
-    box.style.transform = "translate(-50%, -50%) scale(1.05)";
+    box.style.transform = "translate(-50%, -50%) scale(1)";
     box.style.opacity = "1";
   });
 
@@ -352,21 +352,53 @@ function scanVisibleArea() {
 }
 
 // ==================== General ====================
+let hoverTimer = null;
+let lastHoverTarget = null;
+const HOVER_DELAY = 500;
+
+function getSmartOffset(rect, cardWidth = 420, gap = 200) {
+  const viewportRight = window.scrollX + window.innerWidth;
+  
+  let offsetX = gap;
+
+  if (rect.right + cardWidth + gap > viewportRight) {
+    offsetX = -cardWidth - gap + (rect.width / 2);
+  }
+
+  return offsetX;
+}
 
 document.addEventListener("mouseover", (e) => {
   if (!featureEnabled) return;
 
-  const target = e.target;
-  if (!target.classList.contains("ens-detected")) return;
+  const target = e.target.closest(".ens-detected");
+  if (!target) return;
 
-  const rect = target.getBoundingClientRect();
+  if (lastHoverTarget !== target) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+    lastHoverTarget = target;
+  }
 
-  showProfileCard({
-    value: target.dataset.value,
-    type: target.dataset.type,
-    x: rect.left + window.scrollX,
-    y: rect.bottom + window.scrollY + 6,
-  });
+  hoverTimer = setTimeout(() => {
+    const rect = target.getBoundingClientRect();
+    const offsetX = getSmartOffset(rect);
+    showProfileCard({
+      value: target.dataset.value,
+      type: target.dataset.type,
+      x: rect.left + window.scrollX + offsetX,
+      y: rect.bottom + window.scrollY + 6,
+    });
+  }, HOVER_DELAY);
+});
+
+document.addEventListener("mouseout", (e) => {
+  if (!lastHoverTarget) return;
+  if (!e.target.closest(".ens-detected")) return;
+
+  clearTimeout(hoverTimer);
+  hoverTimer = null;
+  lastHoverTarget = null;
 });
 
 document.addEventListener("click", (e) => {
@@ -385,7 +417,7 @@ function showProfileCard(data) {
   iframe.id = "ens-profile-iframe";
   iframe.src = chrome.runtime.getURL("iframe.html");
 
-  const { x, y } = positionIframe(data.x, data.y);
+  const { x, y } = clampPosition(data.x, data.y, 420, 500);
 
   iframe.style.position = "absolute";
   iframe.style.width = "420px";
@@ -413,35 +445,26 @@ function showProfileCard(data) {
   });
 }
 
+function clampPosition(x, y, width, height) {
+  const padding = 10;
+
+  const maxX = window.scrollX + window.innerWidth - width - padding;
+  const maxY = window.scrollY + window.innerHeight - height - padding;
+
+  const minX = window.scrollX + padding;
+  const minY = window.scrollY + padding;
+
+  return {
+    x: Math.min(Math.max(x, minX), maxX),
+    y: Math.min(Math.max(y, minY), maxY),
+  };
+}
+
 function removeIframe() {
   if (currentIframe) {
     currentIframe.remove();
     currentIframe = null;
   }
-}
-
-function positionIframe(x, y, width = 420, height = 500) {
-  const margin = 12;
-
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-
-  let newX = x;
-  let newY = y;
-
-  if (newX + width > viewportWidth - margin) {
-    newX = viewportWidth - width - margin;
-  }
-
-  if (newX < margin) newX = margin;
-
-  if (newY + height > viewportHeight - margin) {
-    newY = y - height - 18;
-  }
-
-  if (newY < margin) newY = margin;
-
-  return { x: newX, y: newY };
 }
 
 function cleanupMarkers() {
