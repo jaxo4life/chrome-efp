@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import ProfileViewer from "./components/ProfileViewer";
 import "./styles.css";
+import { ProfileCard } from "ethereum-identity-kit";
+import "ethereum-identity-kit/css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,10 +49,13 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProfileViewer
+      <ProfileCard
+        className="efp-profile-card"
         addressOrName={profileData.value}
-        type={profileData.type}
-        onClose={handleClose}
+        onProfileClick={() => {
+          window.open(`https://efp.app/${profileData.value}`, "_blank");
+        }}
+        showPoaps
       />
     </QueryClientProvider>
   );

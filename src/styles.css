@@ -40,22 +40,6 @@ body,
   }
 }
 
-.profile-content {
-  width: 100%;
-  height: 100%;
-}
-
-.profile-card-wrapper {
-  width: 100%;
-  height: 100%;
-  padding: 0;
-}
-
-.profile-content,
-.profile-card-wrapper {
-  background: transparent !important;
-}
-
 .efp-profile-card {
   width: 100% !important;
   max-width: 100% !important;
@@ -76,32 +60,4 @@ body,
   margin-right: 8px;
   padding: 0 6px;
   border-radius: 5px;
-}
-
-.card-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.floating-btn {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 16px;
-  background: #2563eb;
-  color: white;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: bold;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  transition: opacity 0.2s, transform 0.2s;
-  opacity: 0.95;
-}
-
-.floating-btn:hover {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-2px);
 }
