@@ -1,10 +1,9 @@
 let siteSettingsCache = {};
 let isCacheReady = false;
 
-// 初始化 siteSettingsCache
 function initSiteSettingsCache() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get({ siteSettings: {} }, ({ siteSettings }) => {
+    chrome.storage.local.get({ siteSettings: {} }, ({ siteSettings }) => {
       siteSettingsCache = siteSettings;
       isCacheReady = true;
       resolve();
@@ -12,13 +11,12 @@ function initSiteSettingsCache() {
   });
 }
 
-// 更新 context menu 标题
 function updateMenuTitleFromUrl(url) {
   const site = new URL(url).origin;
 
   if (siteSettingsCache[site] === undefined) {
     siteSettingsCache[site] = true;
-    chrome.storage.sync.set({ siteSettings: siteSettingsCache });
+    chrome.storage.local.set({ siteSettings: siteSettingsCache });
   }
 
   const disabled = siteSettingsCache[site] === false;
@@ -28,14 +26,12 @@ function updateMenuTitleFromUrl(url) {
   });
 }
 
-// 当 storage 改变时更新缓存
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.siteSettings) {
     siteSettingsCache = changes.siteSettings.newValue;
   }
 });
 
-// 安装/更新时初始化 context menu 和默认站点设置
 chrome.runtime.onInstalled.addListener(async () => {
   await initSiteSettingsCache();
 
@@ -45,16 +41,21 @@ chrome.runtime.onInstalled.addListener(async () => {
     contexts: ["all"],
   });
 
-  const sites = ["https://efp.app", "https://etherscan.io"];
-  for (const site of sites) {
+  const defaultSites = ["https://efp.app", "https://etherscan.io"];
+  let changed = false;
+
+  for (const site of defaultSites) {
     if (siteSettingsCache[site] === undefined) {
       siteSettingsCache[site] = false;
+      changed = true;
     }
   }
-  chrome.storage.sync.set({ siteSettings: siteSettingsCache });
+
+  if (changed) {
+    chrome.storage.local.set({ siteSettings: siteSettingsCache });
+  }
 });
 
-// Tabs 激活时更新 context menu
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   if (!isCacheReady) await initSiteSettingsCache();
   chrome.tabs.get(tabId, (tab) => {
@@ -63,7 +64,6 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   });
 });
 
-// Tabs 更新完成时更新 context menu
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!isCacheReady) await initSiteSettingsCache();
   if (changeInfo.status === "complete" && tab.lastCommittedUrl) {
@@ -71,7 +71,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
-// WebNavigation 完成时更新 context menu
 chrome.webNavigation.onCommitted.addListener(async (details) => {
   if (!isCacheReady) await initSiteSettingsCache();
   if (details.frameId !== 0) return;
@@ -81,7 +80,6 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
   updateMenuTitleFromUrl(url);
 });
 
-// context menu 点击事件
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== "toggle-site") return;
 
@@ -90,7 +88,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   siteSettingsCache[site] = disabled ? true : false;
 
-  chrome.storage.sync.set({ siteSettings: siteSettingsCache }, () => {
+  chrome.storage.local.set({ siteSettings: siteSettingsCache }, () => {
     chrome.tabs.sendMessage(tab.id, {
       type: "SHOW_BLOCK_MESSAGE",
       text: disabled ? "EFP Enabled on this site" : "EFP Disabled on this site",
@@ -101,5 +99,4 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   });
 });
 
-// 扩展启动时立即初始化缓存
 initSiteSettingsCache();

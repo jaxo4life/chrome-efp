@@ -16,11 +16,11 @@ const GLOBAL_REGEX = new RegExp(
   "giu"
 );
 
-chrome.storage.sync.get({ siteSettings: {} }, ({ siteSettings }) => {
+chrome.storage.local.get({ siteSettings: {} }, ({ siteSettings }) => {
   const site = location.origin;
   if (siteSettings[site] === false) return;
 
-  chrome.storage.sync.get({ enabled: true }, ({ enabled }) => {
+  chrome.storage.local.get({ enabled: true }, ({ enabled }) => {
     featureEnabled = enabled;
     if (featureEnabled) startObserver();
   });
