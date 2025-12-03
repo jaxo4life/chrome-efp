@@ -1,6 +1,6 @@
 {
   "name": "efpeverywhere",
-  "version": "1.7",
+  "version": "1.8",
   "description": "EFP Happens Everywhere",
   "scripts": {
     "build": "webpack --mode production",

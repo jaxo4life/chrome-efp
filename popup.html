@@ -10,12 +10,12 @@
           Helvetica, Arial, sans-serif;
         background: #f7f8fa;
         color: #222;
-        width: 220px;
+        width: 250px;
         position: relative;
       }
 
       .title {
-        font-size: 15px;
+        font-size: 20px;
         margin-bottom: 12px;
         font-weight: 650;
         display: flex;
@@ -23,92 +23,28 @@
         align-items: center;
       }
 
-      .help-icon {
+      .help-link {
         font-weight: bold;
-        cursor: pointer;
-        border: 1px solid #ccc;
-        border-radius: 50%;
-        width: 18px;
-        height: 18px;
+        text-decoration: none;
+        color: #4a9cff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 12px;
-        color: #555;
+        font-size: 20px;
+        text-align: center;
       }
 
-      .tooltip {
-        display: none;
-        position: absolute;
-        top: 30px;
-        right: 20px;
-        width: 200px;
-        padding: 8px;
-        background: #fff;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        font-size: 12px;
-        line-height: 1.4;
-        z-index: 10;
+      .text {
+        display: block;
+        margin-top: 10px;
+        font-size: 16px;
+        line-height: 1.6;
+        color: #333;
+        word-break: break-word;
       }
 
-      .switch {
-        position: relative;
-        display: inline-block;
-        width: 52px;
-        height: 28px;
-        vertical-align: middle;
-      }
-
-      .switch input {
-        display: none;
-      }
-
-      .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: #d1d5db;
-        border-radius: 28px;
-        transition: background 0.25s ease;
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
-      }
-
-      .slider:before {
-        content: "";
-        position: absolute;
-        width: 22px;
-        height: 22px;
-        left: 3px;
-        top: 3px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-          box-shadow 0.25s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-      }
-
-      input:checked + .slider {
-        background: #4a9cff;
-      }
-
-      input:checked + .slider:before {
-        transform: translateX(24px);
-      }
-
-      .label-text {
-        margin-left: 12px;
-        font-size: 14px;
-        font-weight: 500;
-      }
-
-      .row {
-        display: flex;
-        align-items: center;
+      .text p {
+        margin: 0 0 10px 0;
       }
     </style>
   </head>
@@ -116,25 +52,26 @@
   <body>
     <div class="title">
       ENS Everywhere
-      <div class="help-icon" id="help">?</div>
+      <a
+        class="help-link"
+        href="https://efpage.jaxoo.xyz/"
+        target="_blank"
+        title="Fly to the moon"
+      >
+        →
+      </a>
     </div>
 
-    <div class="tooltip" id="tooltip">
-      When the extension is enabled, it will automatically detect ENS domains
-      and wallet addresses. A marker will appear below the ENS or address.
-      Hovering over it will show the EFP card. Clicking any empty area will hide
-      the card.
+    <div class="text">
+      <p>The extension is disabled by default on all websites.</p>
+      <p>
+        You need to manually enable it on the websites where you want to use it.
+      </p>
+      <p>It will automatically detect ENS domains and wallet addresses.</p>
+      <p>
+        A marker will appear below the ENS or address. Hovering over it will
+        show the EFP card. Clicking any empty area will close the card.
+      </p>
     </div>
-
-    <div class="row">
-      <label class="switch">
-        <input type="checkbox" id="toggle" />
-        <span class="slider"></span>
-      </label>
-
-      <span class="label-text">Enable Detection</span>
-    </div>
-
-    <script src="popup.js"></script>
   </body>
 </html>

@@ -1,5 +1,3 @@
-let featureEnabled = true;
-
 const AGGRESSIVE_MODE_SITES = ["poap.xyz"];
 
 function isAggressiveModeSite() {
@@ -18,20 +16,9 @@ const GLOBAL_REGEX = new RegExp(
 
 chrome.storage.local.get({ siteSettings: {} }, ({ siteSettings }) => {
   const site = location.origin;
-  if (siteSettings[site] === false) return;
+  if (!siteSettings[site]) return;
 
-  chrome.storage.local.get({ enabled: true }, ({ enabled }) => {
-    featureEnabled = enabled;
-    if (featureEnabled) startObserver();
-  });
-});
-
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.enabled) {
-    featureEnabled = changes.enabled.newValue;
-    if (featureEnabled) startObserver();
-    else cleanupMarkers();
-  }
+  startObserver();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -89,7 +76,6 @@ function debounce(fn, wait) {
 }
 
 const debouncedScan = debounce(() => {
-  if (!featureEnabled) return;
   scanVisibleArea();
 }, 200);
 
@@ -358,19 +344,17 @@ const HOVER_DELAY = 500;
 
 function getSmartOffset(rect, cardWidth = 420, gap = 200) {
   const viewportRight = window.scrollX + window.innerWidth;
-  
+
   let offsetX = gap;
 
   if (rect.right + cardWidth + gap > viewportRight) {
-    offsetX = -cardWidth - gap + (rect.width / 2);
+    offsetX = -cardWidth - gap + rect.width / 2;
   }
 
   return offsetX;
 }
 
 document.addEventListener("mouseover", (e) => {
-  if (!featureEnabled) return;
-
   const target = e.target.closest(".ens-detected");
   if (!target) return;
 
@@ -402,8 +386,6 @@ document.addEventListener("mouseout", (e) => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!featureEnabled) return;
-
   if (currentIframe && currentIframe.contains(e.target)) return;
   if (e.target.classList.contains("ens-detected")) return;
 
